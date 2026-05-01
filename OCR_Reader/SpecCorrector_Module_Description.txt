@@ -1,0 +1,55 @@
+Module Description: Expert Post-OCR Correction Module (SpecCorrector)
+Project: SpecSense AI
+
+--------------------------------------------------------------------------------
+
+1. Overview
+The SpecCorrector is a highly specialized Post-OCR (Optical Character Recognition) processing module within the SpecSense AI system. Due to the inherent noise and artifacts in scanned technical documents, raw OCR output is often mathematically or structurally flawed. The SpecCorrector acts as an "Expert Intermediary" between the initial raw extraction and the strict Engineering Validation engine. Its primary goal is to normalize units, expand abbreviations, intelligently repair common optical misinterpretations using domain heuristics, and ensure the data is perfectly structured before electrical compliance validation occurs.
+
+--------------------------------------------------------------------------------
+
+2. Core Responsibilities & Correction Logic
+
+The module systematically processes the extracted specification dictionary through a series of dedicated correction methods:
+
+A. Complex Dependency Resolution (The "NxS" Rule)
+Method: `correct_size_and_cores(specs)`
+- Problem: OCR frequently extracts bundled strings like "4x16mm2" into a single "Conductor Size" field.
+- Solution: The module implements "Critical Parsing Rule A". It uses regex to detect the "N x S" pattern. It intelligently splits the string, assigning '4' to the Conductor Count and '16 mm²' to the Conductor Size. It explicitly enforces the rule to "NEVER interpret N as the conductor size," preventing catastrophic downstream errors.
+- Unit Normalization: It standardizes spacing and superscripts (e.g., converting "16mm2" or "16 mm2" to the standard "16 mm²").
+
+B. Voltage Formatting
+Method: `correct_voltage(val)`
+- Problem: Inconsistent spacing and casing in raw OCR output (e.g., "0.6/1kv", "450 / 750V").
+- Solution: Normalizes spacing to ensure a clean separation between digits and units (e.g., "0.6/1 kV"). It also rigidly enforces proper casing ("kV" or "V") to ensure the validator can easily parse the numerical values.
+
+C. Temperature Heuristics & Repair
+Method: `correct_temperature(val)`
+- Problem: OCR heavily struggles with temperature symbols, often outputting "90""", "4 0 C", or truncating trailing zeros entirely (e.g., "4 c").
+- Solution: 
+  - Removes internal spaces in digits (merging "4 0" back to "40").
+  - Truncated Zero Heuristic: If the OCR extracts a single digit followed by 'c' (e.g., "4 c"), the module checks if the digit is between 3 and 9. It uses domain knowledge to assume the OCR lost a zero, heuristically repairing it to "40°C".
+  - If a single digit is ambiguous (e.g., "1 c"), it flags the value as "UNVERIFIABLE".
+  - It standardizes all suffixes to the strict "°C" format.
+
+D. Material and Unit Expansion
+Methods: `correct_armor(val)`, `correct_resistance(val)`, `correct_units_generic(val)`
+- Armor: Automatically expands industry acronyms to their full text. Maps "SWA" to "Steel Wire Armor", "STA" to "Steel Tape Armor", "AWA" to "Aluminum Wire Armor", etc.
+- Resistance: Formats the complex Ohm symbol spacing (e.g., correcting "100MΩkm" to standard "100 MΩ·km").
+- Generic Units: Fixes simple casing errors like "Mm" to "mm".
+
+--------------------------------------------------------------------------------
+
+3. Auditing and Logging System
+A vital feature of the SpecCorrector is its transparency. It maintains an internal `corrections_log`. Every time a value is modified, the module records:
+- The Field modified (e.g., "Temperature").
+- The Original raw OCR value.
+- The New Corrected value.
+- The Reason for the change (e.g., "Heuristic Repair (Truncated Zero)", "NxS Split (Size)", "Unit Normalization").
+
+This log is passed along with the final dictionary, allowing users to see exactly how and why the AI altered the original scanned data.
+
+--------------------------------------------------------------------------------
+
+4. Summary in the System Pipeline
+Without the SpecCorrector, the rigorous Validation Module would instantly reject almost all OCR inputs due to slight formatting or OCR truncation errors. By applying intelligent electrical engineering heuristics, the SpecCorrector significantly bridges the gap between imperfect optical vision and strict mathematical validation, making SpecSense AI highly robust and fault-tolerant in real-world scenarios.

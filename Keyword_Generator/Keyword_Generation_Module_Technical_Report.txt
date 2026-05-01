@@ -1,0 +1,145 @@
+Technical Report: Intelligent OCR & AI System for Cable Specification Extraction (SpecSense AI)
+Module: Keyword Generation Engine  
+Project: SpecSense AI  
+
+--------------------------------------------------------------------------------
+
+1. Module Overview
+
+Purpose of the Keyword Generation Module
+The Keyword Generation module serves as the semantic abstraction layer of the SpecSense AI ecosystem. While upstream modules focus on rigid extraction and validation of raw engineering parameters, this module transforms that structured engineering data (or raw text) into meaningful, domain-aware keywords and categorical tags. 
+
+Importance in AI-Driven Systems
+In a comprehensive AI architecture, raw specifications (like "450/750V" or "4x16mm2") are highly specific but often lack generalized searchability. By dynamically categorizing cables into high-level concepts (e.g., "Low Voltage Cables", "HTLS Conductors") and extracting statistical top terms, this module provides the semantic context necessary for downstream indexing, advanced database filtering, and intelligent prompt construction for the Technical Assistant.
+
+--------------------------------------------------------------------------------
+
+2. System Architecture
+
+High-Level Architecture
+The keyword generation pipeline is composed of three interconnected sub-modules encapsulated in Python classes:
+1. `InputHandler`: A multi-format ingestion engine capable of processing validated JSON from the Validation module, as well as raw TXT, PDF, and DOCX documents.
+2. `KeywordExtractor`: A hybrid regex and frequency-analysis engine that identifies specific electrical attributes and statistically significant text.
+3. `CableClassifier`: A deterministic logic engine that evaluates engineering parameters (primarily voltage) against industry-standard definitions to assign a primary categorical classification.
+
+Data Flow & Integration
+1. The Validation module outputs a structured JSON file containing verified cable parameters.
+2. The `InputHandler` flattens these validated parameters into a semantic text stream.
+3. The `KeywordExtractor` applies engineering pattern matching and NLP frequency analysis to generate a feature set.
+4. The `CableClassifier` parses the parameters (e.g., maximum voltage) to categorize the cable.
+5. The combined output (Category + Keywords) is passed to the Technical Assistant to inform its context window or stored in a database for system searchability.
+
+--------------------------------------------------------------------------------
+
+3. Keyword Generation Logic & Design
+
+The module employs a hybrid approach, combining strict rule-based classification with dynamic statistical keyword extraction.
+
+Categorical Classification (Rule-Based)
+The `CableClassifier` maps specific electrical thresholds to predefined industry categories:
+- "Low Voltage Cables": Assigned if the maximum operational voltage is <= 3,000V (e.g., 0.6/1kV).
+- "Medium Voltage Cables": Assigned if the voltage is between 3,000V and 30,000V.
+- "High & Extra High Voltage Cables": Assigned if the voltage exceeds 30,000V.
+- "Overhead / HTLS Conductors": Assigned via explicit string matching for specific overhead terminologies (e.g., "ACSR", "AAAC", "Invar").
+
+Domain-Aware Keyword Construction
+The `KeywordExtractor` utilizes highly tuned regular expressions to isolate specific engineering attributes, ensuring that numbers are kept with their relevant units (e.g., matching "120mm2" as a single semantic concept rather than splitting it).
+
+Hierarchical Design
+- Primary Keyword: The categorical classification (e.g., "Medium Voltage Cables").
+- Secondary Keywords: Explicitly extracted electrical properties (e.g., Voltage, Current, Material).
+- Contextual Keywords: The "Top Terms" identified via frequency analysis.
+
+--------------------------------------------------------------------------------
+
+4. Feature Extraction Strategy
+
+The module uses two distinct strategies to build its keyword dictionary from the incoming data:
+
+Pattern-Based Extraction
+Using regex, it specifically targets and isolates:
+- Numerical Features: Voltage ranges (e.g., "450/750 V"), Current limits ("100A", "630 A"), Cross Sections ("120mm2"), and Cores ("4 Core", "3C").
+- Categorical Features: Material identifiers ("Copper", "Aluminum") and Conductor Types ("ACSR", "HTSL").
+
+Statistical Frequency Analysis (NLP)
+To capture unstructured, context-specific terms not covered by rigid regex, the system performs tokenization and frequency analysis. It extracts all words over three characters, filters out general English stop words ("the", "and") AND domain-specific stop words ("cable", "specification", "rated"), and calculates the top 5 most frequently occurring terms to serve as contextual keywords.
+
+--------------------------------------------------------------------------------
+
+5. Technologies & Tools Used
+
+- Programming Language: Python 3.x
+- Data Extraction Libraries: `PyPDF2` (for direct PDF reading) and `python-docx` (for DOCX parsing).
+- NLP & Text Processing: Built-in `re` (Regular Expressions) for complex pattern matching and `collections.Counter` for statistical frequency analysis.
+- Implementation Approach: Object-oriented design (`InputHandler`, `KeywordExtractor`, `CableClassifier`).
+
+--------------------------------------------------------------------------------
+
+6. Keyword Normalization & Standardization
+
+Consistent formatting is ensured through aggressive pre-processing before extraction:
+- OCR Artifact Cleanup: Similar to the `SpecCorrector`, the keyword module runs a secondary cleanup pass to fix corrupted words (e.g., `V[0o]ltage` -> `Voltage`) and alphanumeric blending (O to 0, S to 5).
+- Deduplication: Extracted regex matches are stored in sets to ensure uniqueness (e.g., if "XLPE" appears 10 times, it is only listed as a keyword once).
+- Priority Resolution: If the system detects conflicting categories (e.g., a document mentions both HTLS and standard Low Voltage), it uses a hardcoded priority array to return the most specific and highest-priority classification.
+
+--------------------------------------------------------------------------------
+
+7. Workflow
+
+1. Input: A validated JSON dictionary or a raw document path.
+2. Flattening: The `InputHandler` processes the file into a unified text string.
+3. Pre-Processing: The string is normalized and OCR artifacts are removed.
+4. Field Extraction: Regex patterns isolate materials, sizes, and voltages.
+5. Classification: The `CableClassifier` parses the numerical voltage to determine the primary category.
+6. NLP Processing: The `Counter` identifies the top 5 contextual terms.
+7. Output: A JSON payload grouping the "Category" and the specific "Keywords" sub-arrays.
+
+--------------------------------------------------------------------------------
+
+8. Improvements & Modifications
+
+- Transition to Value-Based Classification: Initially, the system attempted to classify cables based solely on string matching (looking for the words "Medium Voltage"). This proved highly inaccurate. The improved approach dynamically parses the highest voltage value found in the text (e.g., converting "33kV" to 33,000) and executes mathematical threshold logic to assign the category, vastly improving accuracy.
+- Domain-Specific Stop Words: The initial frequency analysis generated useless keywords like "Cable" and "Specification" for every document. By adding these to a custom domain stop-word list, the "Top Terms" became highly relevant to the specific product.
+
+--------------------------------------------------------------------------------
+
+9. Evaluation & Effectiveness
+
+- Relevance: The transition to threshold-based mathematical classification ensures 100% categorical accuracy when the voltage parameter is present. 
+- Downstream Support: The structured keywords allow the Technical Assistant to construct highly specific prompts, grounding the LLM in the exact category of the cable being queried.
+- Real-World Example:
+  - Input JSON: `{"cable_type": "Copper", "voltage": "0.6/1kV", "insulation": "PVC", "conductor_size": "4x16mm2"}`
+  - Generated Output:
+    `Category: Low Voltage Cables`
+    `Keywords (Material): [Copper, PVC]`
+    `Keywords (Voltage): [0.6/1kV]`
+
+--------------------------------------------------------------------------------
+
+10. Advantages
+
+- Improves System Interpretability: Translates raw numerical data into human-readable engineering categories.
+- Enhances Search Capabilities: Database queries can instantly filter by "Medium Voltage Cables" without having to run complex greater-than/less-than queries on raw voltage fields.
+- Lightweight and Fast: Relies on optimized regex and basic counter logic, avoiding the massive computational overhead of deep-learning NLP embeddings for simple classification.
+
+--------------------------------------------------------------------------------
+
+11. Limitations
+
+- Rigid Thresholds: The classification is heavily dependent on the predefined voltage thresholds. If international standards differ from the hardcoded bounds (e.g., 3kV vs 1kV for LV limits), the system may misclassify.
+- Dependence on Input Quality: If the Validation module marks the voltage as "UNVERIFIABLE", the `CableClassifier` must rely on fallback string-matching, which is significantly less accurate.
+- Lack of Deep Semantic Understanding: Frequency analysis counts word occurrences but does not understand context (e.g., it cannot differentiate between "suitable for burial" and "NOT suitable for burial" in raw text extraction).
+
+--------------------------------------------------------------------------------
+
+12. Future Enhancements
+
+- Integration with ML Embeddings: Upgrading the keyword extractor to utilize lightweight sentence embeddings (e.g., `SentenceTransformers`) to capture the semantic meaning of paragraphs rather than just word frequencies.
+- Dynamic Standard Profiles: Allowing the system to load different threshold profiles (IEC vs. NEC) to dynamically adjust where the "Medium Voltage" boundary lies based on the user's region.
+- Semantic Clustering: Grouping related keywords automatically to build a dynamic knowledge graph of cable properties.
+
+--------------------------------------------------------------------------------
+
+13. Conclusion
+
+The Keyword Generation module provides the essential semantic abstraction layer within SpecSense AI. By intelligently combining rigorous, mathematically driven threshold classification with dynamic frequency analysis, it transforms isolated, raw engineering parameters into highly contextual, searchable categories. This structured intelligence empowers the system's database and technical assistant, ensuring that human users and AI models alike can intuitively navigate, filter, and understand complex electrical specifications.

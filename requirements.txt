@@ -22,3 +22,6 @@ python-docx
 spacy
 PyPDF2
 tqdm
+django
+django-widget-tweaks
+google-generativeai

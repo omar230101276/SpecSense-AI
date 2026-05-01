@@ -25,5 +25,7 @@ echo.
 echo [TIP] The application will open in your default browser.
 echo [TIP] If it doesn't open automatically, visit http://localhost:8501
 echo.
+
+set GEMINI_API_KEY=AIzaSyCvLsR7RBrkaPRMyJorkjRZXAwwVo4LJJg
 streamlit run app.py
 pause

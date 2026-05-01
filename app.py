@@ -12,6 +12,9 @@ from OCR_Reader.src.core_ocr import OCREngine
 from OCR_Reader.src.extraction import SpecificationExtractor, SpecCorrector
 from OCR_Reader.src.validation import CableValidator
 from Keyword_Generator.keyword_tool import KeywordExtractor, CableClassifier
+from Assistant_Module.assistant_engine import run_assistant_pipeline
+from Assistant_Module.llm_service import explain_cable_selection, explain_internal_wiring
+from Assistant_Module.internal_wiring_engine import InternalWiringEngine
 
 # --- PAGE CONFIG ---
 st.set_page_config(
@@ -73,7 +76,7 @@ with st.sidebar:
     
     mode = st.radio(
         "Select Module:",
-        ["Vision Inspection", "Datasheet/OCR Analysis"]
+        ["Vision Inspection", "Datasheet/OCR Analysis", "Intelligent Technical Assistant"]
     )
     
     st.markdown("---")
@@ -81,7 +84,7 @@ with st.sidebar:
     **System Status:**
     ✅ Vision Module: Active
     ✅ OCR Module: Active
-    ✅ Keyword Engine: Active
+    ✅ Assistant Module: Active
     """)
     st.caption("v1.0.0 | Graduation Project")
 
@@ -299,6 +302,174 @@ elif mode == "Datasheet/OCR Analysis":
                 finally:
                     if temp_path and os.path.exists(temp_path):
                         os.remove(temp_path)
+
+# --- MODULE: INTELLIGENT TECHNICAL ASSISTANT ---
+# --- MODULE: INTELLIGENT TECHNICAL ASSISTANT ---
+elif mode == "Intelligent Technical Assistant":
+    st.markdown('<p class="main-header">💡 Intelligent Technical Assistant</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Calculate electrical loads, select cables, and get AI-powered insights.</p>', unsafe_allow_html=True)
+
+    tab1, tab2 = st.tabs(["External Feeder Cable", "Internal Wiring Planning"])
+
+    with tab1:
+        # CSS to style the input container similar to the screenshot
+        st.markdown("""
+        <style>
+            div[data-testid="stVerticalBlock"] > div:has(> div > div > div > div > h3#input-requirements) {
+                background-color: #1E1E1E;
+                border-left: 4px solid #FF4B4B;
+                padding: 20px;
+                border-radius: 5px;
+                margin-bottom: 20px;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
+        with st.container():
+            st.markdown('<h3 id="input-requirements" style="color: white; margin-top: 0;">Input Requirements</h3>', unsafe_allow_html=True)
+            st.markdown("<hr style='margin-top: 10px; margin-bottom: 20px; border-color: #444;'/>", unsafe_allow_html=True)
+            
+            total_power = st.number_input("Total Estimated Power (Watts)", min_value=0.0, value=5000.0, step=100.0)
+            st.markdown('<p style="color: #808495; font-size: 0.8rem; margin-top: -10px; margin-bottom: 15px;">Sum of all appliance wattages</p>', unsafe_allow_html=True)
+            
+            system_type = st.selectbox("System Type", ["Single Phase (e.g. 220V)", "Three Phase (e.g. 380V)"])
+            sys_type_val = "three" if "Three" in system_type else "single"
+            
+            default_voltage = 380 if sys_type_val == "three" else 220
+            voltage = st.number_input("Supply Voltage (V)", min_value=1, value=default_voltage)
+            
+            distance = st.number_input("Cable Distance (meters)", min_value=1.0, value=20.0, step=1.0)
+            st.markdown('<p style="color: #808495; font-size: 0.8rem; margin-top: -10px; margin-bottom: 15px;">Total length from source to load</p>', unsafe_allow_html=True)
+            
+            # Max voltage drop is usually fixed at 5% for standard calculations, or we can keep it hidden
+            max_voltage_drop_pct = 5.0
+
+        if st.button("Calculate & Get AI Insight", type="primary"):
+            appliances = [{'name': 'General Load', 'power': total_power, 'quantity': 1}]
+            
+            with st.spinner("Calculating..."):
+                results = run_assistant_pipeline(appliances, voltage, distance, system_type=sys_type_val, max_voltage_drop_pct=max_voltage_drop_pct)
+            
+            with st.spinner("Generating AI Explanation..."):
+                explanation = explain_cable_selection(results)
+            
+            st.markdown("---")
+            st.subheader("📊 Calculation Results")
+            
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric("Total Load", f"{results['total_power_w']} W")
+            r2.metric("Current", f"{results['current_a']:.2f} A")
+            r3.metric("Safe Current (w/ Margin)", f"{results['safe_current_a']:.2f} A")
+            
+            initial_cable_rec = results.get('initial_cable', {}).get('recommended_mm2', -1)
+            cable_rec = results['cable'].get('recommended_mm2')
+            r4.metric("Recommended Cable", f"{cable_rec} mm²" if cable_rec != -1 else "N/A")
+            
+            if results['validation_warnings']:
+                for w in results['validation_warnings']:
+                    st.warning(w)
+                    
+            if cable_rec == -1:
+                st.error(results['cable'].get('error', 'Error in cable selection.'))
+            else:
+                if initial_cable_rec != -1 and initial_cable_rec != cable_rec:
+                    st.warning(f"⚠️ **Voltage Drop Compensation:** Initial cable size ({initial_cable_rec} mm²) was insufficient due to voltage drop over {distance}m. Adjusted from **{initial_cable_rec} mm² → {cable_rec} mm²**.")
+                    
+                vd_status = results['voltage_drop_status']
+                if "WARNING" in vd_status:
+                    st.error(f"Voltage Drop: {results['voltage_drop_v']:.2f} V ({results.get('voltage_drop_pct', 0):.2f}%) - {vd_status}")
+                else:
+                    st.success(f"Voltage Drop: {results['voltage_drop_v']:.2f} V ({results.get('voltage_drop_pct', 0):.2f}%) - Status: {vd_status}")
+
+            st.markdown("---")
+            st.subheader("🤖 AI Engineering Assistant Insight")
+            st.info(explanation)
+
+    with tab2:
+        st.markdown('### 🏢 Internal Wiring Input Parameters')
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Apartment Details**")
+            num_rooms = st.number_input("Number of Rooms", min_value=1, value=3, step=1)
+            num_acs = st.number_input("Number of AC Units", min_value=0, value=2, step=1)
+            num_lights = st.number_input("Number of Lighting Points", min_value=1, value=10, step=1)
+            num_sockets = st.number_input("Number of Socket Outlets", min_value=1, value=12, step=1)
+            has_kitchen = st.checkbox("Include Dedicated Kitchen Circuit", value=True)
+            
+        with col2:
+            st.markdown("**Load Heuristics (Watts per unit)**")
+            light_w = st.number_input("Lighting Point (W)", min_value=1, value=20, step=5)
+            socket_w = st.number_input("Socket Outlet (W)", min_value=10, value=300, step=50)
+            ac_w = st.number_input("AC Unit (W)", min_value=100, value=1500, step=100)
+            kitchen_w = st.number_input("Kitchen Load (W)", min_value=500, value=3000, step=500)
+            
+            st.markdown("**Diversity Factors (0.1 to 1.0)**")
+            light_df = st.slider("Lighting Diversity Factor", min_value=0.1, max_value=1.0, value=0.8, step=0.1)
+            socket_df = st.slider("Socket Diversity Factor", min_value=0.1, max_value=1.0, value=0.6, step=0.1)
+
+        if st.button("Design Internal Circuits", type="primary"):
+            inputs = {
+                'num_rooms': num_rooms,
+                'num_acs': num_acs,
+                'num_lights': num_lights,
+                'num_sockets': num_sockets,
+                'has_kitchen': has_kitchen
+            }
+            heuristics = {
+                'light_w': light_w,
+                'socket_w': socket_w,
+                'ac_w': ac_w,
+                'kitchen_w': kitchen_w
+            }
+            diversity = {
+                'lighting_df': light_df,
+                'socket_df': socket_df,
+                'ac_df': 0.9,
+                'kitchen_df': 0.8
+            }
+            
+            with st.spinner("Designing circuits..."):
+                wiring_data = InternalWiringEngine.design_internal_wiring(inputs, heuristics, diversity)
+            
+            with st.spinner("Generating AI Explanation..."):
+                wiring_explanation = explain_internal_wiring(wiring_data)
+                
+            st.markdown("---")
+            st.subheader("🔌 Circuit Distribution Table")
+            
+            import pandas as pd
+            df = pd.DataFrame(wiring_data['circuits'])
+            # Rename columns for display
+            df_display = df[['id', 'type', 'power_w', 'current_a', 'cable_size_mm2', 'mcb_a', 'length_m']].copy()
+            df_display.columns = ["Circuit ID", "Type", "Power (W)", "Current (A)", "Cable Size (mm²)", "MCB Rating (A)", "Est. Length (m)"]
+            
+            # Format numbers
+            df_display["Current (A)"] = df_display["Current (A)"].apply(lambda x: f"{x:.2f}")
+            df_display["Est. Length (m)"] = df_display["Est. Length (m)"].apply(lambda x: f"{x:.1f}")
+            
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            
+            st.markdown("---")
+            st.subheader("📦 Cable Summary & Total Load")
+            
+            s1, s2 = st.columns(2)
+            with s1:
+                st.markdown("**Estimated Total Loads:**")
+                st.write(f"- **Raw Connected Load:** {wiring_data['summary']['total_power_w']:.0f} W")
+                st.write(f"- **Diversified Load:** {wiring_data['summary']['total_power_diversified_w']:.0f} W")
+            
+            with s2:
+                st.markdown("**Cable Length Requirements:**")
+                for size, length in wiring_data['summary']['cable_totals'].items():
+                    if size != -1:
+                        st.write(f"- **{size} mm²:** {length:.1f} meters")
+                    else:
+                        st.write(f"- **Warning:** {length:.1f} meters of cable could not be sized correctly.")
+                        
+            st.markdown("---")
+            st.subheader("🤖 AI Wiring Insight")
+            st.info(wiring_explanation)
 
 # --- FOOTER ---
 st.markdown("---")
