@@ -5,6 +5,13 @@ import numpy as np
 from PIL import Image
 import tempfile
 
+from db.database import engine
+from db.models import Base
+
+Base.metadata.create_all(bind=engine)
+
+print("Tables created successfully!")
+
 # Module Imports
 # Ensure these match your folder structure
 from Vision_Model import analyze_cable_image
@@ -12,6 +19,11 @@ from OCR_Reader.src.core_ocr import OCREngine
 from OCR_Reader.src.extraction import SpecificationExtractor, SpecCorrector
 from OCR_Reader.src.validation import CableValidator
 from Keyword_Generator.keyword_tool import KeywordExtractor, CableClassifier
+from db.crud import (
+    create_document, create_inspection, create_segmentation_result,
+    create_cable_spec, create_keywords, create_validation_history
+)
+from db.database import SessionLocal
 
 # --- PAGE CONFIG ---
 st.set_page_config(
@@ -176,7 +188,36 @@ if mode == "Vision Inspection":
                                             st.table({k: str(v) for k, v in cable_data.items()})
                                 else:
                                     st.warning("No cables detected in the image.")
-                                    
+
+                                # --- SAVE TO DATABASE ---
+                                try:
+                                    db = SessionLocal()
+                                    doc = create_document(
+                                        db,
+                                        file_name=uploaded_file.name,
+                                        file_path=temp_path,
+                                        file_type=os.path.splitext(uploaded_file.name)[1].lstrip('.')
+                                    )
+                                    for cable_data in data:
+                                        if "Error" in cable_data:
+                                            continue
+                                        inspection = create_inspection(
+                                            db,
+                                            document_id=doc.doc_id,
+                                            image_path=temp_path,
+                                            status=cable_data.get("Status", "Unknown")
+                                        )
+                                        create_segmentation_result(
+                                            db,
+                                            inspection_id=inspection.id,
+                                            diameter_mm=cable_data.get("Diameter (mm)"),
+                                            detection_method="yolo_box"
+                                        )
+                                    db.close()
+                                    st.success("Results saved to database.")
+                                except Exception as db_err:
+                                    st.warning(f"Database save warning: {db_err}")
+
                             else:
                                 # Error returned in data list
                                 st.error(data[0].get("Error", "Unknown Analysis Error"))
@@ -270,9 +311,44 @@ elif mode == "Datasheet/OCR Analysis":
 
                     if validation_result['status'] != 'NOT READY':
                         st.markdown("---")
-                        
+
+                        # --- SAVE TO DATABASE ---
+                        try:
+                            db = SessionLocal()
+                            doc = create_document(
+                                db,
+                                file_name=uploaded_file.name,
+                                file_path=temp_path,
+                                file_type=os.path.splitext(uploaded_file.name)[1].lstrip('.')
+                            )
+                            spec = create_cable_spec(
+                                db,
+                                doc_id=doc.doc_id,
+                                voltage_rating=clean_specs.get('voltage'),
+                                conductor_material=clean_specs.get('cable_type'),
+                                insulation_type=clean_specs.get('insulation'),
+                                number_of_cores=clean_specs.get('conductor_count'),
+                                cross_section_area=clean_specs.get('conductor_size'),
+                                armor_type=clean_specs.get('armor'),
+                                sheath_material=clean_specs.get('sheath'),
+                                operating_temperature=clean_specs.get('operating_temperature'),
+                                is_verified=validation_result.get('valid', False),
+                                extraction_confidence=1.0
+                            )
+                            create_keywords(db, spec.spec_id, keywords)
+                            create_validation_history(
+                                db,
+                                spec_id=spec.spec_id,
+                                corrected_data=str(clean_specs),
+                                was_ai_correct=validation_result.get('valid', False)
+                            )
+                            db.close()
+                            st.success("Results saved to database.")
+                        except Exception as db_err:
+                            st.warning(f"Database save warning: {db_err}")
+
                         # Row 2: Keywords & Classification
-                        st.subheader("🏷️ Keyword Generation")
+                        st.subheader("Keyword Generation")
                         
                         k1, k2 = st.columns([1, 2])
                         with k1:
@@ -302,4 +378,5 @@ elif mode == "Datasheet/OCR Analysis":
 
 # --- FOOTER ---
 st.markdown("---")
+
 st.markdown("<div style='text-align: center; color: #aaa; font-size: 0.8rem;'>© 2025 SpecSense AI | Graduation Project Team</div>", unsafe_allow_html=True)
