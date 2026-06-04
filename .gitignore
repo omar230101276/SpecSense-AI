@@ -36,3 +36,9 @@ models_cache/
 # Project specific
 .env
 .DS_Store
+
+# Excluded folders as requested
+test-branch/
+raw/
+SpecSenseAI_React.zip
+SpecSenseAI_React/

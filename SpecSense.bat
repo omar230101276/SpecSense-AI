@@ -27,5 +27,5 @@ echo [TIP] If it doesn't open automatically, visit http://localhost:8501
 echo.
 
 set GEMINI_API_KEY=
-streamlit run app.py
+python -m streamlit run app.py
 pause

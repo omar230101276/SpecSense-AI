@@ -15,6 +15,7 @@ from Keyword_Generator.keyword_tool import KeywordExtractor, CableClassifier
 from Assistant_Module.assistant_engine import run_assistant_pipeline
 from Assistant_Module.llm_service import explain_cable_selection, explain_internal_wiring
 from Assistant_Module.internal_wiring_engine import InternalWiringEngine
+from Assistant_Module.project_parser import parse_project_description
 
 # --- PAGE CONFIG ---
 st.set_page_config(
@@ -388,88 +389,170 @@ elif mode == "Intelligent Technical Assistant":
     with tab2:
         st.markdown('### 🏢 Internal Wiring Input Parameters')
         
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**Apartment Details**")
-            num_rooms = st.number_input("Number of Rooms", min_value=1, value=3, step=1)
-            num_acs = st.number_input("Number of AC Units", min_value=0, value=2, step=1)
-            num_lights = st.number_input("Number of Lighting Points", min_value=1, value=10, step=1)
-            num_sockets = st.number_input("Number of Socket Outlets", min_value=1, value=12, step=1)
-            has_kitchen = st.checkbox("Include Dedicated Kitchen Circuit", value=True)
-            
-        with col2:
-            st.markdown("**Load Heuristics (Watts per unit)**")
-            light_w = st.number_input("Lighting Point (W)", min_value=1, value=20, step=5)
-            socket_w = st.number_input("Socket Outlet (W)", min_value=10, value=300, step=50)
-            ac_w = st.number_input("AC Unit (W)", min_value=100, value=1500, step=100)
-            kitchen_w = st.number_input("Kitchen Load (W)", min_value=500, value=3000, step=500)
-            
-            st.markdown("**Diversity Factors (0.1 to 1.0)**")
-            light_df = st.slider("Lighting Diversity Factor", min_value=0.1, max_value=1.0, value=0.8, step=0.1)
-            socket_df = st.slider("Socket Diversity Factor", min_value=0.1, max_value=1.0, value=0.6, step=0.1)
+        # Initialize session state values if not present
+        if 'rooms_input' not in st.session_state:
+            st.session_state.rooms_input = 3
+        if 'acs_input' not in st.session_state:
+            st.session_state.acs_input = 2
+        if 'lights_input' not in st.session_state:
+            st.session_state.lights_input = 10
+        if 'sockets_input' not in st.session_state:
+            st.session_state.sockets_input = 12
+        if 'kitchen_input' not in st.session_state:
+            st.session_state.kitchen_input = True
+        if 'building_type_val' not in st.session_state:
+            st.session_state.building_type_val = None
+        if 'project_description' not in st.session_state:
+            st.session_state.project_description = ""
+        if 'ai_analyzed' not in st.session_state:
+            st.session_state.ai_analyzed = False
 
-        if st.button("Design Internal Circuits", type="primary"):
-            inputs = {
-                'num_rooms': num_rooms,
-                'num_acs': num_acs,
-                'num_lights': num_lights,
-                'num_sockets': num_sockets,
-                'has_kitchen': has_kitchen
-            }
-            heuristics = {
-                'light_w': light_w,
-                'socket_w': socket_w,
-                'ac_w': ac_w,
-                'kitchen_w': kitchen_w
-            }
-            diversity = {
-                'lighting_df': light_df,
-                'socket_df': socket_df,
-                'ac_df': 0.9,
-                'kitchen_df': 0.8
-            }
+        # Input Mode Selector
+        input_mode = st.radio("Select Input Mode:", ["Manual Entry", "AI Project Description"], horizontal=True)
+        
+        show_form = True
+        
+        if input_mode == "AI Project Description":
+            desc_placeholder = (
+                "Describe your building or project (English or Arabic).\n\n"
+                "Example:\n"
+                "I have a two-floor villa with 6 rooms, 5 air conditioners, around 40 lighting points, "
+                "25 socket outlets, and a large kitchen."
+            )
+            desc_text = st.text_area(
+                "Project Description",
+                value=st.session_state.project_description,
+                placeholder=desc_placeholder,
+                height=150
+            )
+            st.session_state.project_description = desc_text
             
-            with st.spinner("Designing circuits..."):
-                wiring_data = InternalWiringEngine.design_internal_wiring(inputs, heuristics, diversity)
-            
-            with st.spinner("Generating AI Explanation..."):
-                wiring_explanation = explain_internal_wiring(wiring_data)
-                
-            st.markdown("---")
-            st.subheader("🔌 Circuit Distribution Table")
-            
-            import pandas as pd
-            df = pd.DataFrame(wiring_data['circuits'])
-            # Rename columns for display
-            df_display = df[['id', 'type', 'power_w', 'current_a', 'cable_size_mm2', 'mcb_a', 'length_m']].copy()
-            df_display.columns = ["Circuit ID", "Type", "Power (W)", "Current (A)", "Cable Size (mm²)", "MCB Rating (A)", "Est. Length (m)"]
-            
-            # Format numbers
-            df_display["Current (A)"] = df_display["Current (A)"].apply(lambda x: f"{x:.2f}")
-            df_display["Est. Length (m)"] = df_display["Est. Length (m)"].apply(lambda x: f"{x:.1f}")
-            
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
-            
-            st.markdown("---")
-            st.subheader("📦 Cable Summary & Total Load")
-            
-            s1, s2 = st.columns(2)
-            with s1:
-                st.markdown("**Estimated Total Loads:**")
-                st.write(f"- **Raw Connected Load:** {wiring_data['summary']['total_power_w']:.0f} W")
-                st.write(f"- **Diversified Load:** {wiring_data['summary']['total_power_diversified_w']:.0f} W")
-            
-            with s2:
-                st.markdown("**Cable Length Requirements:**")
-                for size, length in wiring_data['summary']['cable_totals'].items():
-                    if size != -1:
-                        st.write(f"- **{size} mm²:** {length:.1f} meters")
-                    else:
-                        st.write(f"- **Warning:** {length:.1f} meters of cable could not be sized correctly.")
+            if st.button("Analyze Project Description", type="primary"):
+                if not desc_text.strip():
+                    st.error("Please enter a project description first.")
+                else:
+                    with st.spinner("AI is analyzing your project description..."):
+                        parsed_data = parse_project_description(desc_text)
                         
+                        if "error" in parsed_data:
+                            st.error(parsed_data["error"])
+                        else:
+                            # Store description and set states
+                            st.session_state.project_description = desc_text
+                            st.session_state.rooms_input = parsed_data.get("rooms")
+                            st.session_state.acs_input = parsed_data.get("ac_units")
+                            st.session_state.lights_input = parsed_data.get("lighting_points")
+                            st.session_state.sockets_input = parsed_data.get("socket_outlets")
+                            
+                            # Handle kitchen boolean
+                            kitchen_val = parsed_data.get("kitchen")
+                            st.session_state.kitchen_input = bool(kitchen_val) if kitchen_val is not None else False
+                            
+                            st.session_state.building_type_val = parsed_data.get("building_type")
+                            st.session_state.ai_analyzed = True
+                            st.success("Project description analyzed successfully! Review and edit the extracted details in the form below.")
+            
+            if st.session_state.ai_analyzed:
+                if st.session_state.building_type_val:
+                    st.info(f"**Detected Building Type**: {st.session_state.building_type_val.capitalize()}")
+                else:
+                    st.warning("⚠️ **Building Type**: Not explicitly detected. (Details can be edited below)")
+                show_form = True
+            else:
+                show_form = False
+        else:
+            # If switched to Manual Entry, reset state so it doesn't show building type banner
+            st.session_state.ai_analyzed = False
+            
+        if show_form:
             st.markdown("---")
-            st.subheader("🤖 AI Wiring Insight")
-            st.info(wiring_explanation)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("**Apartment/Building Details**")
+                # Using key binding to let session state prepopulate and sync changes
+                num_rooms = st.number_input("Number of Rooms", min_value=1, step=1, key="rooms_input")
+                num_acs = st.number_input("Number of AC Units", min_value=0, step=1, key="acs_input")
+                num_lights = st.number_input("Number of Lighting Points", min_value=1, step=1, key="lights_input")
+                num_sockets = st.number_input("Number of Socket Outlets", min_value=1, step=1, key="sockets_input")
+                has_kitchen = st.checkbox("Include Dedicated Kitchen Circuit", key="kitchen_input")
+                
+            with col2:
+                st.markdown("**Load Heuristics (Watts per unit)**")
+                light_w = st.number_input("Lighting Point (W)", min_value=1, value=20, step=5)
+                socket_w = st.number_input("Socket Outlet (W)", min_value=10, value=300, step=50)
+                ac_w = st.number_input("AC Unit (W)", min_value=100, value=1500, step=100)
+                kitchen_w = st.number_input("Kitchen Load (W)", min_value=500, value=3000, step=500)
+                
+                st.markdown("**Diversity Factors (0.1 to 1.0)**")
+                light_df = st.slider("Lighting Diversity Factor", min_value=0.1, max_value=1.0, value=0.8, step=0.1)
+                socket_df = st.slider("Socket Diversity Factor", min_value=0.1, max_value=1.0, value=0.6, step=0.1)
+
+            if st.button("Design Internal Circuits", type="primary"):
+                # Validate inputs
+                if num_rooms is None or num_lights is None or num_sockets is None:
+                    st.error("❌ **Validation Error**: Please fill in all required fields (Rooms, Lights, and Sockets cannot be empty).")
+                else:
+                    inputs = {
+                        'num_rooms': int(num_rooms),
+                        'num_acs': int(num_acs) if num_acs is not None else 0,
+                        'num_lights': int(num_lights),
+                        'num_sockets': int(num_sockets),
+                        'has_kitchen': bool(has_kitchen)
+                    }
+                    heuristics = {
+                        'light_w': light_w,
+                        'socket_w': socket_w,
+                        'ac_w': ac_w,
+                        'kitchen_w': kitchen_w
+                    }
+                    diversity = {
+                        'lighting_df': light_df,
+                        'socket_df': socket_df,
+                        'ac_df': 0.9,
+                        'kitchen_df': 0.8
+                    }
+            
+                    with st.spinner("Designing circuits..."):
+                        wiring_data = InternalWiringEngine.design_internal_wiring(inputs, heuristics, diversity)
+                    
+                    with st.spinner("Generating AI Explanation..."):
+                        wiring_explanation = explain_internal_wiring(wiring_data)
+                        
+                    st.markdown("---")
+                    st.subheader("🔌 Circuit Distribution Table")
+                    
+                    import pandas as pd
+                    df = pd.DataFrame(wiring_data['circuits'])
+                    # Rename columns for display
+                    df_display = df[['id', 'type', 'power_w', 'current_a', 'cable_size_mm2', 'mcb_a', 'length_m']].copy()
+                    df_display.columns = ["Circuit ID", "Type", "Power (W)", "Current (A)", "Cable Size (mm²)", "MCB Rating (A)", "Est. Length (m)"]
+                    
+                    # Format numbers
+                    df_display["Current (A)"] = df_display["Current (A)"].apply(lambda x: f"{x:.2f}")
+                    df_display["Est. Length (m)"] = df_display["Est. Length (m)"].apply(lambda x: f"{x:.1f}")
+                    
+                    st.dataframe(df_display, use_container_width=True, hide_index=True)
+                    
+                    st.markdown("---")
+                    st.subheader("📦 Cable Summary & Total Load")
+                    
+                    s1, s2 = st.columns(2)
+                    with s1:
+                        st.markdown("**Estimated Total Loads:**")
+                        st.write(f"- **Raw Connected Load:** {wiring_data['summary']['total_power_w']:.0f} W")
+                        st.write(f"- **Diversified Load:** {wiring_data['summary']['total_power_diversified_w']:.0f} W")
+                    
+                    with s2:
+                        st.markdown("**Cable Length Requirements:**")
+                        for size, length in wiring_data['summary']['cable_totals'].items():
+                            if size != -1:
+                                st.write(f"- **{size} mm²:** {length:.1f} meters")
+                            else:
+                                st.write(f"- **Warning:** {length:.1f} meters of cable could not be sized correctly.")
+                                
+                    st.markdown("---")
+                    st.subheader("🤖 AI Wiring Insight")
+                    st.info(wiring_explanation)
 
 # --- FOOTER ---
 st.markdown("---")
