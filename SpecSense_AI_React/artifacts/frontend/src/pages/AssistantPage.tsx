@@ -497,7 +497,7 @@ function WiringTab() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    {["ID", "Type", "Power (W)", "Current (A)", "Cable (mm²)", "MCB (A)", "Length (m)"].map((h) => (
+                    {["ID", "Type", "Power (W)", "Current (A)", "Cable (mm²)", "MCB (A)"].map((h) => (
                       <th key={h}>{h}</th>
                     ))}
                   </tr>
@@ -511,7 +511,6 @@ function WiringTab() {
                       <td>{c.current_a?.toFixed(2)}</td>
                       <td>{c.cable_size_mm2}</td>
                       <td>{c.mcb_a}</td>
-                      <td>{c.length_m?.toFixed(1)}</td>
                     </tr>
                   ))}
                 </tbody>
