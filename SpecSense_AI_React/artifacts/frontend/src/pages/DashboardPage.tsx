@@ -232,8 +232,8 @@ export default function DashboardPage() {
                 href: "/vision"
               },
               {
-                title: "Safety Calculator",
-                desc: "Safety calculator is representation of wire sizes and overcurrent protections.",
+                title: "Technical Assistant",
+                desc: "Size feeder cables and design optimal wiring plans with AI insights.",
                 uptime: "Recent Uptime: 1 hour ago",
                 href: "/assistant"
               }
