@@ -93,9 +93,10 @@ def _regex_parse(text: str) -> dict:
         ac_units = 2
     else:
         ac_units = (
-            _extract_number_before(r'تكييف(?:ات)?|مكيف(?:ات)?|وحدات?\s+تكييف|air\s+conditioners?|a\.?c\.?\s+units?', t) or
-            _extract_number_after(r'(?:تكييف|مكيف|air\s+conditioner|a\.?c\.?)\s*(?:units?)?\s*:?', t)
+            _extract_number_before(r'تكييف(?:ات)?|مكيف(?:ات)?|وحدات?\s+تكييف|أجهزة\s+تكييف|air\s+conditioners?|air\s+conditioning(?:\s+units?)?|a\.?\/?[cCsS]?\s+units?|a\.?\/?[cCsS]?', t) or
+            _extract_number_after(r'(?:تكييف|مكيف|أجهزة\s+تكييف|air\s+conditioners?|air\s+conditioning|a\.?\/?[cCsS]?)\s*(?:units?)?\s*:?', t)
         )
+
 
     # ── Lighting points ─────────────────────────────────────────
     lighting = None
