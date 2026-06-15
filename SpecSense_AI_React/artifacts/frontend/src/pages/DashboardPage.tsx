@@ -127,6 +127,69 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        {/* Available Engineering Modules (Full-width, 3-column Grid) */}
+        <div className="flex flex-col gap-4 mt-2">
+          <p className="card-title" style={{ margin: 0 }}><Activity size={14} />Available Engineering Modules</p>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+            {[
+              {
+                title: "OCR Engine",
+                desc: "OCR Engine is validation system modules.",
+                uptime: "Recent Uptime: 1 hour ago",
+                href: "/ocr"
+              },
+              {
+                title: "Vision Module",
+                desc: "Transform vision measurements and YOLOv8 validation module.",
+                uptime: "Recent Uptime: 1 hour ago",
+                href: "/vision"
+              },
+              {
+                title: "Technical Assistant",
+                desc: "Size feeder cables and design optimal wiring plans with AI insights.",
+                uptime: "Recent Uptime: 1 hour ago",
+                href: "/assistant"
+              }
+            ].map((m) => (
+              <Link key={m.title} href={m.href}>
+                <div 
+                  className="card" 
+                  style={{ 
+                    cursor: "pointer", 
+                    display: "flex", 
+                    flexDirection: "column", 
+                    justifyContent: "space-between", 
+                    minHeight: "130px", 
+                    padding: "20px",
+                    transition: "transform var(--transition), border-color var(--transition)"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-3px)";
+                    e.currentTarget.style.borderColor = "var(--border-bright)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "none";
+                    e.currentTarget.style.borderColor = "var(--border)";
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                      <div className="flex items-center gap-2">
+                        <span className="status-dot" style={{ margin: 0, width: "8px", height: "8px" }} />
+                        <h3 style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text-primary)" }}>{m.title}</h3>
+                      </div>
+                      <span className="metric-badge badge-success" style={{ margin: 0, padding: "2px 8px", fontSize: "0.65rem", borderRadius: "4px" }}>ACTIVE</span>
+                    </div>
+                    <p className="text-xs text-secondary" style={{ lineHeight: 1.5, margin: 0 }}>{m.desc}</p>
+                  </div>
+                  <p className="text-muted" style={{ fontSize: "0.68rem", margin: "12px 0 0 0" }}>{m.uptime}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
         {/* Metrics Grid */}
         <div className="metrics-grid">
           <div 
@@ -210,69 +273,6 @@ export default function DashboardPage() {
               <div style={{ color: "var(--info)", padding: "4px" }}><Database size={18} /></div>
             </div>
             <p className="metric-sub">PostgreSQL system state</p>
-          </div>
-        </div>
-
-        {/* Available Engineering Modules (Full-width, 3-column Grid) */}
-        <div className="flex flex-col gap-4 mt-2">
-          <p className="card-title" style={{ margin: 0 }}><Activity size={14} />Available Engineering Modules</p>
-          
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
-            {[
-              {
-                title: "OCR Engine",
-                desc: "OCR Engine is validation system modules.",
-                uptime: "Recent Uptime: 1 hour ago",
-                href: "/ocr"
-              },
-              {
-                title: "Vision Module",
-                desc: "Transform vision measurements and YOLOv8 validation module.",
-                uptime: "Recent Uptime: 1 hour ago",
-                href: "/vision"
-              },
-              {
-                title: "Technical Assistant",
-                desc: "Size feeder cables and design optimal wiring plans with AI insights.",
-                uptime: "Recent Uptime: 1 hour ago",
-                href: "/assistant"
-              }
-            ].map((m) => (
-              <Link key={m.title} href={m.href}>
-                <div 
-                  className="card" 
-                  style={{ 
-                    cursor: "pointer", 
-                    display: "flex", 
-                    flexDirection: "column", 
-                    justifyContent: "space-between", 
-                    minHeight: "130px", 
-                    padding: "20px",
-                    transition: "transform var(--transition), border-color var(--transition)"
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-3px)";
-                    e.currentTarget.style.borderColor = "var(--border-bright)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "none";
-                    e.currentTarget.style.borderColor = "var(--border)";
-                  }}
-                >
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                      <div className="flex items-center gap-2">
-                        <span className="status-dot" style={{ margin: 0, width: "8px", height: "8px" }} />
-                        <h3 style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text-primary)" }}>{m.title}</h3>
-                      </div>
-                      <span className="metric-badge badge-success" style={{ margin: 0, padding: "2px 8px", fontSize: "0.65rem", borderRadius: "4px" }}>ACTIVE</span>
-                    </div>
-                    <p className="text-xs text-secondary" style={{ lineHeight: 1.5, margin: 0 }}>{m.desc}</p>
-                  </div>
-                  <p className="text-muted" style={{ fontSize: "0.68rem", margin: "12px 0 0 0" }}>{m.uptime}</p>
-                </div>
-              </Link>
-            ))}
           </div>
         </div>
 
