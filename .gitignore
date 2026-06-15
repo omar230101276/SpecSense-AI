@@ -40,5 +40,7 @@ models_cache/
 # Excluded folders as requested
 test-branch/
 raw/
+material/
 SpecSenseAI_React.zip
 SpecSenseAI_React/
+
