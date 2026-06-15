@@ -23,6 +23,97 @@ async function apiDesignWiring(body: object) {
   return res.json();
 }
 
+
+/* ── Markdown Renderer for LLM Reports ── */
+function MarkdownRenderer({ text }: { text: string }) {
+  if (!text) return null;
+
+  // Split text by newlines
+  const lines = text.split("\n");
+  
+  return (
+    <div className="flex flex-col gap-3">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={idx} style={{ height: "4px" }} />;
+
+        // Header Check (### or ## or ***)
+        if (trimmed.startsWith("###")) {
+          return (
+            <h4 
+              key={idx} 
+              className="text-accent-light font-bold mt-2" 
+              style={{ fontSize: "0.9rem", borderBottom: "1px solid var(--border)", paddingBottom: "4px" }}
+            >
+              {trimmed.replace(/^###\s*/, "")}
+            </h4>
+          );
+        }
+        if (trimmed.startsWith("##") || trimmed.startsWith("***")) {
+          const cleanHeader = trimmed.replace(/^(##|\*\*\*)\s*/, "").replace(/\*+$/, "").trim();
+          // Check if it's a disclaimer header
+          const isDisclaimer = cleanHeader.toLowerCase().includes("disclaimer");
+          return (
+            <h4 
+              key={idx} 
+              className={isDisclaimer ? "text-warning font-bold mt-3" : "text-accent-light font-bold mt-3"} 
+              style={{ fontSize: "0.875rem", textTransform: "uppercase", letterSpacing: "0.05em" }}
+            >
+              {cleanHeader}
+            </h4>
+          );
+        }
+
+        // Bullet Check (* or - or 1., 2.)
+        const isBullet = trimmed.startsWith("*") || trimmed.startsWith("-");
+        const isNumbered = /^\d+\.\s+/.test(trimmed);
+
+        if (isBullet || isNumbered) {
+          let content = trimmed;
+          if (isBullet) {
+            content = trimmed.replace(/^[\*\-]\s*/, "");
+          } else {
+            content = trimmed.replace(/^\d+\.\s*/, "");
+          }
+
+          // Parse bold text **bold**
+          const parts = content.split("**");
+          const parsedContent = parts.map((part, pIdx) => {
+            if (pIdx % 2 === 1) {
+              return <strong key={pIdx} className="text-primary">{part}</strong>;
+            }
+            return part;
+          });
+
+          return (
+            <div key={idx} className="flex gap-2 text-sm pl-4 items-start" style={{ color: "var(--text-secondary)", lineHeight: "1.6" }}>
+              <span className="text-accent-light" style={{ marginTop: "2px", fontWeight: "bold" }}>
+                {isNumbered ? `${trimmed.match(/^\d+/)![0]}.` : "•"}
+              </span>
+              <span>{parsedContent}</span>
+            </div>
+          );
+        }
+
+        // Standard Paragraph
+        const parts = trimmed.split("**");
+        const parsedContent = parts.map((part, pIdx) => {
+          if (pIdx % 2 === 1) {
+            return <strong key={pIdx} className="text-primary">{part}</strong>;
+          }
+          return part;
+        });
+
+        return (
+          <p key={idx} className="text-sm" style={{ lineHeight: 1.6, color: "var(--text-secondary)", margin: 0 }}>
+            {parsedContent}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── Feeder Tab ── */
 function FeederTab() {
   const [form, setForm] = useState({
@@ -158,7 +249,7 @@ function FeederTab() {
           {res.ai_explanation && (
             <div className="card">
               <p className="card-title">🤖 AI Engineering Insight</p>
-              <p className="text-sm" style={{ lineHeight: 1.8, color: "var(--text-secondary)" }}>{res.ai_explanation}</p>
+              <MarkdownRenderer text={res.ai_explanation} />
             </div>
           )}
         </div>
@@ -459,7 +550,7 @@ function WiringTab() {
           {res.ai_explanation && (
             <div className="card">
               <p className="card-title">🤖 AI Wiring Insight</p>
-              <p className="text-sm" style={{ lineHeight: 1.8, color: "var(--text-secondary)" }}>{res.ai_explanation}</p>
+              <MarkdownRenderer text={res.ai_explanation} />
             </div>
           )}
         </div>

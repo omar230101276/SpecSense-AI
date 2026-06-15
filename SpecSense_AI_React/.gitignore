@@ -52,3 +52,7 @@ dist/
 
 # Scratch and temp files
 scratch/
+
+# Databases
+*.db
+
