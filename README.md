@@ -1,60 +1,76 @@
-# SpecSense AI
+# SpecSense AI — Intelligent Cable Specification & Inspection Control System
 
-**SpecSense AI** is an advanced OCR and AI-powered system designed for the automated parsing of cable specifications and keyword generation. It leverages computer vision and natural language processing to extract, correct, and validate technical data from documents and images.
+**SpecSense AI** is a state-of-the-art computer vision and natural language processing system built to automate cable specification extraction, datasheet analysis, and structural cross-section inspection.
 
-## Features
+The system features two user interfaces:
+1. **React & FastAPI Enterprise Portal (Recommended)**: A high-fidelity, dual-server application with real-time dashboards, persistent inspection logs (using PostgreSQL with transparent SQLite fallback), interactive design calculation sheets, and robust proxy routing.
+2. **Streamlit Quick Console**: A lightweight, single-page python interface for rapid local testing and single-spec parsing.
 
-- **Automated Extraction**: Extracts technical specifications (Voltage, Current, Armour, etc.) from cable datasheets and images.
-- **AI-Powered OCR**: Uses EasyOCR and PyTorch for robust text recognition.
-- **Keyword Generation**: Generates relevant keywords for cable products to improve searchability and categorization.
-- **Validation Engine**: Validates extracted data against engineering standards.
-- **User Interface**: Interactive web interface built with Streamlit for easy uploading and verification.
+---
 
-## Project Structure
+## 🚀 Key Modules & Capabilities
 
-- **`OCR_Reader/`**: Core OCR engine and extraction logic (including Spacy and regex parsers).
-- **`Keyword_Generator/`**: Module for generating listing keywords from cable descriptions.
-- **`Vision_Model/`**: Computer vision models (YOLO) for detecting cable structures/tables.
-- **`Validator/`**: Logic to validate and correct extracted specifications.
-- **`app.py`**: Main entry point for the Streamlit web application.
-- **`SpecSense.bat`**: Automated setup and startup script for Windows.
+* **Vision Cable Inspection (YOLOv8)**: Run cross-section segmentations and classification on cable images to compute structural measurements (diameters, layers, insulation status).
+* **Technical Datasheet Parser (OCR & Spacy)**: Extract and clean key attributes (Voltage, Current, Armour, Shielding) from PDF datasheets.
+* **Intelligent Wiring & Feeder Designer**: Enter power requirements, distances, and voltage parameters to automatically calculate wiring gauges, circuit designs, and voltage drops.
+* **History Feed & Analytics**: Access a central operational log of past analyses, vision runs, and design projects.
 
-## Installation & Usage
+---
 
-### Method 1: Automated (Recommended)
+## 📂 Project Structure
 
-Simply run the provided batch script:
-```cmd
-SpecSense.bat
+```text
+SpecSense AI/
+├── SpecSense_AI_React/       # React & FastAPI Enterprise Workspace
+│   ├── artifacts/frontend/   # React Single Page App (Vite + TS + Custom Glassmorphism CSS)
+│   ├── server.py             # FastAPI Backend Server (Uvicorn)
+│   ├── db_manager.py         # DB Manager with PostgreSQL to SQLite Fallback
+│   └── run_project.bat       # Startup script for both React & FastAPI servers
+│
+├── SpecSense.bat             # Streamlit quick console startup script
+├── app.py                    # Streamlit application entry point
+│
+├── Vision_Model/             # Core YOLO v8 training & inference pipelines
+├── OCR_Reader/               # OCR text extraction algorithms
+├── Keyword_Generator/        # Product keyword generation logic
+└── Validator/                # Engineering standards compliance validator
 ```
-This script will automatically:
-1. Create a Python virtual environment (`venv`).
-2. Install all required dependencies from `requirements.txt`.
-3. Launch the Streamlit application in your default browser.
 
-### Method 2: Manual Setup
+---
 
-1. **Create and Activate Virtual Environment**:
-   ```bash
-   python -m venv venv
-   .\venv\Scripts\activate
+## 🛠️ Quick Start
+
+### Method 1: React & FastAPI Enterprise Workspace (Recommended)
+
+To run the full React client and FastAPI server:
+1. Navigate to the `SpecSense_AI_React/` directory.
+2. Configure your API credentials inside `.env` (copy from `.env.example`).
+3. Double-click the **`run_project.bat`** script or run it from your command prompt:
+   ```cmd
+   cd SpecSense_AI_React
+   run_project.bat
    ```
+This script automatically:
+* Safely terminates any dangling/zombie processes on ports `8000` (FastAPI) and `5173` (Vite) using robust PowerShell bindings.
+* Boots the Uvicorn FastAPI server on `http://127.0.0.1:8000`.
+* Boots the Vite React application on `http://localhost:5173`.
+* Polls the backend until it is fully active (handling PostgreSQL connection timeouts and SQLite fallback transparently), then opens the browser automatically.
 
-2. **Install Dependencies**:
-   ```bash
-   pip install -r requirements.txt
+---
+
+### Method 2: Streamlit Quick Console
+
+To run the lightweight Streamlit application:
+1. Double-click the **`SpecSense.bat`** script in the project root:
+   ```cmd
+   SpecSense.bat
    ```
+This will configure your virtual environment, install requirements, and boot Streamlit at `http://localhost:8501`.
 
-3. **Run the Application**:
-   ```bash
-   streamlit run app.py
-   ```
+---
 
-## Key Technologies
+## 📦 Database Modes
 
-- **Python**: Core programming language.
-- **Streamlit**: Web interface.
-- **PyTorch**: Deep learning framework.
-- **EasyOCR**: Optical Character Recognition.
-- **Ultralytics (YOLO)**: Object detection for document layout analysis.
-- **Spacy**: Natural Language Processing for entity extraction.
+The React interface features robust dual-database operation:
+* **PostgreSQL (Production)**: Connects to your Postgres server defined in `.env` for multi-user deployments.
+* **SQLite (Fallback)**: If PostgreSQL is offline, the backend automatically falls back to `specsense_local.db` in the background. No manual setup or Docker is required to start developing immediately.
